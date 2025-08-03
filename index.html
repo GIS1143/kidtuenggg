@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>คิดถึงจึงเขียนโค้ด</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Sarabun', sans-serif;
+      background-color: #fffaf5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    @keyframes zoomFadeIn {
+      0% {
+        opacity: 0;
+        transform: scale(0.8) rotate(0deg);
+      }
+      60% {
+        opacity: 0.5;
+        transform: scale(1.05) rotate(0.5deg);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1) rotate(0deg);
+      }
+    }
+    .choiceBtn {
+      animation: zoomFadeIn 0.6s ease-out forwards, floatWiggle 2s ease-in-out infinite;
+    }
+    @keyframes floatWiggle {
+      0%   { transform: translate(0, 0); }
+      25%  { transform: translate(-0.5px, 0.5px); }
+      50%  { transform: translate(0.5px, -0.5px); }
+      75%  { transform: translate(-0.3px, 0.3px); }
+      100% { transform: translate(0, 0); }
+    }
+    #messageText {
+      opacity: 0;
+      transition: opacity 2s ease-in;
+    }
+    .show {
+      animation: zoomFadeIn 0.6s ease-out forwards, floatWiggle 2s ease-in-out infinite;
+      opacity: 1;
+      display: inline-block;
+    }
+    .container {
+      text-align: center;
+    }
+    #inputSection {
+      padding: 20px;
+    }
+    input, button {
+      padding: 10px;
+      margin-top: 10px;
+      border: none;
+      border-radius: 5px;
+      font-size: 1rem;
+      font-family: 'Sarabun', sans-serif;
+    }
+    #questionText {
+      opacity: 0;
+      font-size: 1rem;
+      transition: opacity 1s ease-in;
+      margin-bottom: 10px;
+    }
+    #questionText.show {
+      animation: zoomFadeIn 0.6s ease-out forwards, floatWiggle 2s ease-in-out infinite;
+      opacity: 1;
+      display: inline-block;
+    }
+    #messageBox {
+      cursor: pointer;
+      font-size: 0.8rem;
+      animation: subtleShake 0.4s ease-in-out;
+    }
+    button:hover {
+      background-color: #ffd0b3;
+    }
+    #messageText {
+      font-size: 0.9rem;
+      opacity: 0;
+      transition: opacity 0.5s ease-in;
+      margin-top: 20px;
+      line-height: 1.8;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="inputSection">
+      <p>ใส่รหัสนักเรียนเพื่อรับพลังใจ </p>
+      <input type="text" id="studentId" placeholder="พิมพ์รหัสนักเรียน...">
+      <button onclick="loadStudent()">เข้าเลย!</button>
+    </div>
+    <div id="messageBox" onclick="nextMessage()">
+      <p id="messageText"></p>
+    </div>
+    <div id="choiceSection">
+      <p id="questionText">พักผ่อนครั้งนี้ของเธอเป็นยังไงบ้างน้า?</p>
+      <div id="choiceButtons" class="hidden">
+        <button class="choiceBtn" onclick="handleChoice('good')">แฮปปี้ เอเนอจี้จอยๆ</button>
+        <button class="choiceBtn" onclick="handleChoice('sleepy')">เศร้าซึม</button>
+        <button class="choiceBtn" onclick="handleChoice('unsure')">บอกไม่ถูก</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    let stage = 0;
+    let studentName = "";
+    let messages = [];
+    let currentMsgIndex = 0;
+    let isAfterFeeling = false;
+    let feelingQueue = [];
+
+    function loadStudent() {
+      const id = document.getElementById("studentId").value.trim();
+      if (!id) {
+        alert("คุณเป็นใครกันน! ");
+        return;
+      }
+      fetch("students.json")
+        .then(response => response.json())
+        .then(data => {
+          const student = data.find(s => s.id.toString() === id);
+          if (student) {
+            studentName = student.name.trim();
+            stage = 0;
+            document.getElementById("inputSection").classList.add("hidden");
+            document.getElementById("choiceButtons").classList.add("hidden");
+            document.getElementById("questionText").classList.remove("show");
+            showInitialMessage();
+          } else {
+            alert("มาอัฟนะ เราไม่รู้จักคุณ");
+          }
+        });
+    }
+
+    function showInitialMessage() {
+      document.getElementById("messageBox").classList.remove("hidden");
+      showMessage(`สวัสดี ${studentName} 🌼`);
+    }
+
+    function nextMessage() {
+      if (stage === 0) {
+        showMessage("ดีใจที่ได้เจอกันอีกนะ", () => { stage = 1; });
+        stage = -1;
+        return;
+      } else if (stage === 1) {
+        showFeelingChoices();
+        stage = 2;
+        return;
+      } else if (stage === 3) {
+        if (currentMsgIndex < feelingQueue.length) {
+          showMessage(feelingQueue[currentMsgIndex++]);
+        } else {
+          setupMessages();
+          currentMsgIndex = 0;
+          stage = 4;
+          showMessage(messages[currentMsgIndex]);
+        }
+        return;
+      } else if (stage === 4) {
+        currentMsgIndex++;
+        if (currentMsgIndex < messages.length) {
+          showMessage(messages[currentMsgIndex]);
+        }
+      }
+    }
+
+    function showMessage(msg, callback = null) {
+      const text = document.getElementById("messageText");
+      text.classList.remove("show");
+      text.style.animation = "none";
+      void text.offsetWidth;
+      text.innerText = msg;
+      text.style.animation = null;
+      text.classList.add("show");
+      if (callback) setTimeout(callback, 1000);
+    }
+
+    function showFeelingChoices() {
+      const msgBox = document.getElementById("messageBox");
+      msgBox.classList.add("hidden");
+      document.getElementById("choiceSection").classList.remove("hidden");
+      document.getElementById("questionText").classList.add("show");
+      document.getElementById("choiceButtons").classList.remove("hidden");
+    }
+
+    const feelingMessages = {
+      good: [
+        "ใครมาขโมยความสุขนี้ไป เราจะไปจัดการเอง >:)",
+        "หวังว่าเธอจะมีพลังใจไปทั้งเทอมเลยนะ 💪"
+      ],
+      sleepy: [
+        "หัวใจน่ะ... เกิดมาเพื่อแตกบ้าง ซ่อมบ้าง ร้องไห้บ้าง",
+        "แล้วก็ยิ้มได้อีกบ้าง :)"
+      ],
+      unsure: [
+        "บางทีเราอาจไม่ต้องแน่ใจตลอดเวลาก็ได้",
+        "ขอแค่ยังอยู่ตรงนี้ เท่านี้ก็พอแล้ว",
+        "ยังไงก็"
+      ]
+    };
+
+    function handleChoice(feeling) {
+      let response = "";
+      switch (feeling) {
+        case "good": response = "ดีใจที่ได้ยินแบบน้านน 💚"; break;
+        case "sleepy": response = "*airhug*"; break;
+        case "unsure": response = "ไม่เป็นไรเลย ขอบคุณที่ซื่อสัตย์กับความรู้สึกตัวเองนะ "; break;
+      }
+      feelingQueue = [...feelingMessages[feeling]];
+      currentMsgIndex = 0;
+      document.getElementById("choiceSection").classList.add("hidden");
+      document.getElementById("messageBox").classList.remove("hidden");
+      stage = 3;
+      showMessage(response);
+    }
+
+    function setupMessages() {
+      messages = [
+        "...",
+        ` ขอให้ทุกวันของ${studentName}มีแต่รอยยิ้ม`,
+        "ถูกรักโดยตัวเองเยอะๆ",
+        "เรียนหนื่อยมาตั้งครึ่งเทอมแล้ว",
+        "พักผ่อนให้เต็มที่ แล้วค่อยกลับมาเจอกันนะ ;)",
+        "คืนนี้... ขอให้หลับสบาย",
+        "และขอให้... หลับแบบไม่ฝันเลย 🌙",
+        "อยู่ไกล แต่ส่งกำลังใจให้เสมอ ",
+        `I love u , ${studentName} <3`
+      ];
+    }
+
+    document.getElementById("studentId").addEventListener("keydown", function(e) {
+      if (e.key === "Enter") {
+        loadStudent();
+      }
+    });
+  </script>
+</body>
+</html>
